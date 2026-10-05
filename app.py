@@ -53,7 +53,7 @@ with aba_ia:
                 try:
                     client = genai.Client(api_key=api_key_input)
                     
-                    # Definido como uma linha única contínua usando representação de quebra de linha para evitar quebra de literal física
+                    # Concatenando explicitamente sem quebras de linha físicas no literal para evitar erros de sintaxe no Streamlit
                     instrucao_sistema = (
                         "Você é o Assistente Editorial e Revisor Ético de Jornalismo, especializado na orientação de jornalistas "
                         "e redatores para a cobertura responsável de crimes e pautas sobre violência contra a mulher, seguindo "
