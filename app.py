@@ -45,16 +45,16 @@ else:
             else:
                 # Dividindo o texto por sentenças de forma simples usando pontuação (. ! ?)
                 sentencas = [s.strip() for s in re.split(r'[.!?\n]+', texto_materia) if len(s.strip()) > 5]
-                
+
                 st.subheader("📋 Relatório de Análise Ética (Local)")
-                
+
                 trechos_alertas = []
                 trechos_seguros = []
 
                 for s in sentencas:
                     predicao = modelo_local.predict([s])[0]
                     probabilidade = modelo_local.predict_proba([s])[0]
-                    
+
                     if predicao == 1:
                         trechos_alertas.append((s, probabilidade[1]))
                     else:
@@ -63,7 +63,7 @@ else:
                 if trechos_alertas:
                     st.error(f"⚠️ Identificamos {len(trechos_alertas)} trecho(s) com forte indício de desvio ético ou sensacionalismo:")
                     for trecho, prob in trechos_alertas:
-                        st.markdown(f"* "{trecho}" — **(Confiança: {prob:.2%})**")
+                        st.markdown(f"* '{trecho}' — **(Confiança: {prob:.2%})**")
                         st.caption("💡 *Dica do Manual Universa: Evite termos que culpabilizem a vítima, que tentem atenuar o crime justificando o comportamento do agressor (ex: ciúmes, bebida), ou termos antigos como 'crime passional'. Recomenda-se o uso de termos técnicos e objetivos (como 'feminicídio' ou 'agressão'). Lembre-se de adicionar canais de acolhimento como o Ligue 180.*")
                         st.write("---")
                 else:
@@ -72,7 +72,7 @@ else:
                 if trechos_seguros:
                     with st.expander("Visualizar trechos identificados como seguros"):
                         for trecho, prob in trechos_seguros:
-                            st.write(f"✔️ "{trecho}" — (Seguro com {prob:.2%})")
+                            st.write(f"✔️ '{trecho}' — (Seguro com {prob:.2%})")
 
     with aba_classificador:
         st.header("Classificador Estatístico Rápido")
