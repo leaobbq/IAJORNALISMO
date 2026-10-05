@@ -1,20 +1,18 @@
 import streamlit as st
 import joblib
-from google import genai
-from google.genai import types
-import os
+import re
 
 # Configuração inicial da página web
 st.set_page_config(
-    page_title="Assistente Editorial e Revisor Ético",
+    page_title="Revisor Editorial Ético Local",
     page_icon="📰",
     layout="wide"
 )
 
-st.title("📰 Assistente Editorial & Revisor Ético para Jornalismo")
-st.markdown("Esta aplicação auxilia redatores e editores a produzirem matérias mais neutras, profissionais e alinhadas com as diretrizes de ética jornalística do **Manual Universa**.")
+st.title("📰 Revisor Editorial & Classificador Ético Gratuito")
+st.markdown("Esta aplicação funciona de forma **100% local e gratuita** (sem uso de APIs pagas ou chaves do Gemini). Ela utiliza o modelo estatístico treinado com as diretrizes do **Manual Universa** para analisar textos jornalísticos.")
 
-# Função para carregar o modelo de Machine Learning local com cache
+# Função para carregar o modelo de Machine Learning local
 @st.cache_resource
 def carregar_modelo():
     try:
@@ -24,74 +22,75 @@ def carregar_modelo():
 
 modelo_local = carregar_modelo()
 
-# Barra lateral - Configuração de Credenciais da API
-st.sidebar.header("⚙️ Configuração de Credenciais")
-api_key_input = st.sidebar.text_input("Insira sua Gemini API Key:", type="password")
+if modelo_local is None:
+    st.error("❌ Arquivo 'modelo_jornalismo.pkl' não foi encontrado. Certifique-se de subir este arquivo no seu GitHub junto com o app.py!")
+else:
+    # Interface em Abas
+    aba_revisor, aba_classificador = st.tabs(["🔍 Revisor Ético de Matérias (Local)", "📊 Classificador Rápido de Sentenças"])
 
-# Interface em Abas
-aba_ia, aba_local = st.tabs(["✨ Revisor Ético Avançado (Gemini)", "📊 Classificador Estatístico Local"])
+    with aba_revisor:
+        st.header("Revisor Ético de Textos Completos")
+        st.write("O sistema analisa seu rascunho de matéria dividindo-o período por período para identificar possíveis desvios éticos ou sensacionalistas.")
 
-with aba_ia:
-    st.header("Revisor Ético de Matérias (Manual Universa)")
-    st.write("Analisa profundamente rascunhos de notícias sobre violência contra a mulher.")
-
-    texto_ia = st.text_area(
-        "Cole o rascunho da matéria para revisão ética:",
-        placeholder="Ex: Uma jovem diz ter sido estuprada ontem à noite...",
-        height=200,
-        key="input_ia"
-    )
-
-    if st.button("Iniciar Análise de IA", type="primary"):
-        if not api_key_input:
-            st.warning("🔑 Por favor, insira sua chave da API do Gemini na barra lateral esquerda para prosseguir.")
-        elif not texto_ia.strip():
-            st.warning("Digite ou cole uma matéria para analisar.")
-        else:
-            with st.spinner("Analisando com base no Manual Universa..."):
-                try:
-                    client = genai.Client(api_key=api_key_input)
-
-                    # Definindo explicitamente sem quebras físicas para evitar qualquer erro de sintaxe no Streamlit
-                    instrucao_sistema = "Você é o Assistente Editorial e Revisor Ético de Jornalismo, especializado na orientação de jornalistas e redatores para a cobertura responsável de crimes e pautas sobre violência contra a mulher, seguindo estritamente o Manual Universa de Boas Práticas na Cobertura da Violência contra a Mulher.\n\nSua função é orientar repórteres durante o planejamento, apuração, redação e revisão de rascunhos de matérias.\n\nAo revisar o texto fornecido, exija estritamente o cumprimento das regras:\n1. **As 5 Regras de Ouro**: Conhecer a legislação, jamais culpabilizar a vítima, não justificar o agressor (como alegar ciúmes, bebida ou descontrole), evitar o sensacionalismo/morbidez e amparar-se legalmente.\n2. **Vocabulário Ético**: Corrija termos inadequados (mude 'crime passional' para 'feminicídio'; mude 'mulher diz ter sido estuprada' para 'mulher denuncia estupro'; preserve a nomenclatura jurídica).\n3. **Canais de Apoio**: Exija sempre a indicação de canais de denúncia e acolhimento como o Ligue 180 ou 190.\n\nForneça um feedback bem estruturado ao jornalista apontando os desvios éticos ou de linguagem e sugira a reescrita correta."
-
-                    response = client.models.generate_content(
-                        model='gemini-2.5-flash-lite',
-                        contents=texto_ia,
-                        config=types.GenerateContentConfig(
-                            system_instruction=instrucao_sistema,
-                            temperature=0.2,
-                        )
-                    )
-
-                    st.subheader("📝 Feedback do Revisor Ético:")
-                    st.markdown(response.text)
-
-                except Exception as e:
-                    st.error(f"Erro ao processar requisição: {e}")
-
-with aba_local:
-    st.header("Classificador Estatístico Offline (ML)")
-    st.write("Modelo estatístico rápido de Machine Learning treinado localmente no servidor.")
-
-    if modelo_local is None:
-        st.error("❌ Arquivo 'modelo_jornalismo.pkl' não foi encontrado no servidor da aplicação.")
-    else:
-        texto_local = st.text_area(
-            "Cole o texto para verificar sensibilidade de termos:",
-            placeholder="Ex: O prefeito assinou o decreto de pavimentação das vias...",
-            height=150,
-            key="input_local"
+        texto_materia = st.text_area(
+            "Cole o rascunho completo da sua notícia aqui:",
+            placeholder="Cole aqui o rascunho da matéria para revisão offline...",
+            height=250,
+            key="input_revisor"
         )
 
-        if st.button("Verificar Sensibilidade"):
-            if not texto_local.strip():
-                st.warning("Digite algum texto para realizar a verificação.")
+        if st.button("Analisar Matéria Inteira", type="primary"):
+            if not texto_materia.strip():
+                st.warning("Por favor, digite ou cole um texto para ser analisado.")
             else:
-                predicao = modelo_local.predict([texto_local])[0]
-                probabilidade = modelo_local.predict_proba([texto_local])[0]
+                # Dividindo o texto por sentenças de forma simples usando pontuação (. ! ?)
+                sentencas = [s.strip() for s in re.split(r'[.!?\n]+', texto_materia) if len(s.strip()) > 5]
+                
+                st.subheader("📋 Relatório de Análise Ética (Local)")
+                
+                trechos_alertas = []
+                trechos_seguros = []
+
+                for s in sentencas:
+                    predicao = modelo_local.predict([s])[0]
+                    probabilidade = modelo_local.predict_proba([s])[0]
+                    
+                    if predicao == 1:
+                        trechos_alertas.append((s, probabilidade[1]))
+                    else:
+                        trechos_seguros.append((s, probabilidade[0]))
+
+                if trechos_alertas:
+                    st.error(f"⚠️ Identificamos {len(trechos_alertas)} trecho(s) com forte indício de desvio ético ou sensacionalismo:")
+                    for trecho, prob in trechos_alertas:
+                        st.markdown(f"* "{trecho}" — **(Confiança: {prob:.2%})**")
+                        st.caption("💡 *Dica do Manual Universa: Evite termos que culpabilizem a vítima, que tentem atenuar o crime justificando o comportamento do agressor (ex: ciúmes, bebida), ou termos antigos como 'crime passional'. Recomenda-se o uso de termos técnicos e objetivos (como 'feminicídio' ou 'agressão'). Lembre-se de adicionar canais de acolhimento como o Ligue 180.*")
+                        st.write("---")
+                else:
+                    st.success("✅ Nenhuma frase com desvios éticos explícitos foi encontrada pelo modelo local! O texto parece seguir um tom profissional e ético.")
+
+                if trechos_seguros:
+                    with st.expander("Visualizar trechos identificados como seguros"):
+                        for trecho, prob in trechos_seguros:
+                            st.write(f"✔️ "{trecho}" — (Seguro com {prob:.2%})")
+
+    with aba_classificador:
+        st.header("Classificador Estatístico Rápido")
+        st.write("Teste a sensibilidade de uma frase de forma direta e veja a probabilidade calculada pelo modelo estatístico.")
+
+        frase_teste = st.text_input(
+            "Digite uma frase ou termo para testar:",
+            placeholder="Ex: O homem matou a esposa motivado por ciúmes."
+        )
+
+        if st.button("Classificar Frase"):
+            if not frase_teste.strip():
+                st.warning("Por favor, insira uma frase para classificar.")
+            else:
+                predicao = modelo_local.predict([frase_teste])[0]
+                probabilidade = modelo_local.predict_proba([frase_teste])[0]
 
                 if predicao == 1:
-                    st.error(f"⚠️ **ALERTA**: Este texto pode conter termos inadequados, sensacionalistas ou tendenciosos! (Confiança: {probabilidade[1]:.2%})")
+                    st.error(f"⚠️ **ALERTA**: Esta frase pode conter termos inadequados, sensacionalistas ou violadores das diretrizes éticas. (Probabilidade de desvio: {probabilidade[1]:.2%})")
                 else:
-                    st.success(f"✅ **SEGURO**: O texto possui um tom neutro e profissional adequado para a publicação. (Confiança: {probabilidade[0]:.2%})")
+                    st.success(f"✅ **SEGURO**: Esta frase possui um tom neutro, objetivo e profissional de acordo com o modelo. (Confiança: {probabilidade[0]:.2%})")
